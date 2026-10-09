@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  # 后端API服务
+  api:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=redis
+      - DATABASE_PATH=/data/intel_system.db
+      - VECTOR_DB_PATH=/data/vector_store.db
+    volumes:
+      - intel_data:/data
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  # Redis缓存
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+
+  # 前端（如果需要）
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  intel_data:
+  redis_data:

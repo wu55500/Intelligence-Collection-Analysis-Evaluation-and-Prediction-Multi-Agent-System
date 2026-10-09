@@ -1,9 +1,45 @@
+# ===== 后端工程 =====
 fastapi>=0.110.0
 uvicorn[standard]>=0.29.0
 pydantic>=2.5.0
 pydantic-settings>=2.2.0
 httpx>=0.27.0
+python-multipart>=0.0.9
+websockets>=12.0
+
+# ===== 数据库 =====
+# SQLite 保存结构化业务状态
+# Redis 用于低延迟缓存和协调
+redis>=5.0.0
+
+# ===== 数据工程 =====
+# httpx 已在上方
+# BeautifulSoup 按需
+beautifulsoup4>=4.12.0
+
+# ===== Agent 开发 =====
 litellm>=1.30.0
+
+# ===== 统计与机器学习 =====
 numpy>=1.26.0
 pandas>=2.1.0
 scipy>=1.12.0
+scikit-learn>=1.4.0
+statsmodels>=0.14.0
+
+# ===== 向量检索 =====
+# BM25 优先，向量数据库按需
+# sentence-transformers>=2.2.0  # 按需启用
+
+# ===== 运筹学 =====
+# SciPy.optimize 已在 scipy
+# OR-Tools 按需启用
+# ortools>=9.8.0
+
+# ===== 测试 =====
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+pytest-cov>=4.1.0
+
+# ===== 工具 =====
+python-dotenv>=1.0.0

@@ -189,9 +189,21 @@ class ForecastService:
         越小越好，0表示完美预测
         """
         if forecasts is None:
-            # 获取所有已结算的预测
-            # 简化实现：这里应该从数据库查询所有已结算预测
-            forecasts = []
+            # 获取所有已结算的预测（从数据库查询）
+            forecasts = self.db.get_settled_forecasts()
+        else:
+            # 传入的预测对象可能是内存中的旧引用，需要从DB刷新状态
+            all_settled = self.db.get_settled_forecasts()
+            settled_ids = {f.forecast_id for f in all_settled}
+            refreshed = []
+            for f in forecasts:
+                if f.forecast_id in settled_ids:
+                    # 用DB中的最新版本替换
+                    latest = next(x for x in all_settled if x.forecast_id == f.forecast_id)
+                    refreshed.append(latest)
+                elif f.settled and f.outcome in ("hit", "miss"):
+                    refreshed.append(f)
+            forecasts = refreshed
         
         settled = [f for f in forecasts if f.settled and f.outcome in ("hit", "miss")]
         

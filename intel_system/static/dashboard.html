@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>情报收集分析评估预测多Agent系统 - V2</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #0a0e1a; color: #e0e6ed; min-height: 100vh; }
+.header { background: linear-gradient(135deg, #1a1f3a 0%, #0d1117 100%); padding: 16px 20px; border-bottom: 1px solid #1e3a5f; }
+.header h1 { font-size: 16px; color: #58a6ff; }
+.header .subtitle { font-size: 11px; color: #8b949e; margin-top: 4px; }
+.status-bar { display: flex; gap: 8px; padding: 12px 20px; background: #0d1117; border-bottom: 1px solid #21262d; overflow-x: auto; }
+.status-chip { display: flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 12px; font-size: 11px; white-space: nowrap; }
+.chip-ok { background: #0d2818; color: #3fb950; border: 1px solid #238636; }
+.chip-warn { background: #2d1b00; color: #d29922; border: 1px solid #9e6a03; }
+.chip-info { background: #0c2d6b; color: #58a6ff; border: 1px solid #1f6feb; }
+.dot { width: 6px; height: 6px; border-radius: 50%; }
+.dot-green { background: #3fb950; }
+.dot-yellow { background: #d29922; }
+.container { padding: 12px 16px; max-width: 800px; margin: 0 auto; }
+.card { background: #161b22; border: 1px solid #21262d; border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
+.card-header { padding: 10px 14px; background: #1c2128; border-bottom: 1px solid #21262d; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+.card-header h3 { font-size: 13px; color: #c9d1d9; }
+.card-body { padding: 12px 14px; font-size: 12px; line-height: 1.6; }
+.btn { padding: 6px 14px; border-radius: 6px; border: 1px solid #30363d; background: #21262d; color: #c9d1d9; font-size: 11px; cursor: pointer; }
+.btn-primary { background: #238636; border-color: #238636; color: #fff; }
+.btn-blue { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+.btn:active { opacity: 0.7; }
+.btn-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.result-box { margin-top: 10px; padding: 10px; background: #0d1117; border: 1px solid #21262d; border-radius: 6px; font-family: monospace; font-size: 11px; white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; color: #8b949e; }
+.log-line { margin: 2px 0; }
+.log-ok { color: #3fb950; }
+.log-err { color: #f85149; }
+.log-warn { color: #d29922; }
+.log-info { color: #58a6ff; }
+.metric-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #21262d; }
+.metric-label { color: #8b949e; }
+.metric-value { color: #58a6ff; font-weight: 600; }
+.tabs { display: flex; gap: 0; margin-bottom: 12px; border-bottom: 1px solid #21262d; }
+.tab { padding: 8px 16px; font-size: 12px; color: #8b949e; cursor: pointer; border-bottom: 2px solid transparent; }
+.tab.active { color: #58a6ff; border-bottom-color: #58a6ff; }
+.hidden { display: none; }
+.loading { color: #d29922; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🔍 情报收集分析评估预测多Agent系统</h1>
+  <div class="subtitle">V2 四层架构 · 验收闸门 · 红队验证 · 智能路由 · 持久化检查点</div>
+</div>
+
+<div class="status-bar" id="statusBar">
+  <div class="status-chip chip-info"><span class="dot dot-yellow"></span> 检查中...</div>
+</div>
+
+<div class="container">
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" data-tab="dashboard">仪表盘</div>
+    <div class="tab" data-tab="routing">智能路由</div>
+    <div class="tab" data-tab="redteam">红队验证</div>
+    <div class="tab" data-tab="forecast">预测闭环</div>
+    <div class="tab" data-tab="gate">验收闸门</div>
+  </div>
+
+  <!-- Dashboard Tab -->
+  <div id="tab-dashboard">
+    <div class="card">
+      <div class="card-header"><h3>📊 系统概览</h3></div>
+      <div class="card-body" id="systemOverview">
+        <div class="loading">加载中...</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h3>🧠 记忆系统</h3></div>
+      <div class="card-body" id="memoryStats">
+        <div class="loading">加载中...</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h3>📈 系统健康</h3></div>
+      <div class="card-body" id="healthInfo">
+        <div class="loading">加载中...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Routing Tab -->
+  <div id="tab-routing" class="hidden">
+    <div class="card">
+      <div class="card-header"><h3>🎯 智能模型路由</h3></div>
+      <div class="card-body">
+        <p>不同任务类型自动选择最适合的模型（支持 OpenAI/Anthropic/Google/DeepSeek）</p>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="routeModel('research')">🔬 研究类</button>
+          <button class="btn btn-blue" onclick="routeModel('analysis')">📐 分析类</button>
+          <button class="btn" onclick="routeModel('report')">📝 报告类</button>
+          <button class="btn" onclick="routeModel('ner')">⚡ NER/摘要</button>
+          <button class="btn" onclick="routeModel('general')">🌐 通用</button>
+        </div>
+        <div class="result-box" id="routingResult">点击下方按钮查看路由结果...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Red Team Tab -->
+  <div id="tab-redteam" class="hidden">
+    <div class="card">
+      <div class="card-header"><h3>🛡️ 红队独立验证</h3></div>
+      <div class="card-body">
+        <p>验证一个分析结论：检查来源独立性、反证、方法、基线、证伪锚点</p>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="redteamVerify('good')">✅ 高质量证据</button>
+          <button class="btn" onclick="redteamVerify('no_anchor')">❌ 无证伪锚点</button>
+          <button class="btn" onclick="redteamVerify('pseudo_source')">🔗 伪独立来源</button>
+        </div>
+        <div class="result-box" id="redteamResult">点击按钮测试红队验证...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Forecast Tab -->
+  <div id="tab-forecast" class="hidden">
+    <div class="card">
+      <div class="card-header"><h3>📅 预测登记与结算</h3></div>
+      <div class="card-body">
+        <p>登记预测 → 结算 → 计算Brier Score（不可覆盖，只追加）</p>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="runForecastLifecycle()">🚀 完整生命周期</button>
+          <button class="btn" onclick="listForecasts()">📋 查看预测列表</button>
+        </div>
+        <div class="result-box" id="forecastResult">点击运行预测生命周期演示...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Validation Gate Tab -->
+  <div id="tab-gate" class="hidden">
+    <div class="card">
+      <div class="card-header"><h3>🚧 验收闸门测试</h3></div>
+      <div class="card-body">
+        <p>验证模块输出是否符合契约：关键模块必须产出证据引用，失败则阻断流程</p>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="testGate('valid')">✅ 有效输出</button>
+          <button class="btn" onclick="testGate('empty')">🚫 空数据</button>
+          <button class="btn" onclick="testGate('critical_fail')">💥 关键模块失败</button>
+        </div>
+        <div class="result-box" id="gateResult">点击测试验收闸门...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '';  // same origin
+
+// Tab switching
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelectorAll('[id^="tab-"]').forEach(el => el.classList.add('hidden'));
+    document.getElementById('tab-' + tab.dataset.tab).classList.remove('hidden');
+  });
+});
+
+async function fetchJSON(url, options) {
+  const resp = await fetch(API + url, options);
+  return resp.json();
+}
+
+function fmt(obj) {
+  return JSON.stringify(obj, null, 2);
+}
+
+// Load dashboard
+async function loadDashboard() {
+  try {
+    const status = await fetchJSON('/api/v1/status');
+    const bar = document.getElementById('statusBar');
+    const features = status.features || {};
+    bar.innerHTML = Object.entries(features).map(([k, v]) =>
+      `<div class="status-chip ${v ? 'chip-ok' : 'chip-warn'}"><span class="dot ${v ? 'dot-green' : 'dot-yellow'}"></span> ${k}</div>`
+    ).join('');
+
+    document.getElementById('systemOverview').innerHTML = `
+      <div class="metric-row"><span class="metric-label">版本</span><span class="metric-value">${status.version}</span></div>
+      <div class="metric-row"><span class="metric-label">架构</span><span class="metric-value">${status.architecture}</span></div>
+      <div class="metric-row"><span class="metric-label">手机模式</span><span class="metric-value">${status.mobile_mode ? '✓ 启用' : '✗ 关闭'}</span></div>
+      <div class="metric-row"><span class="metric-label">时间</span><span class="metric-value">${new Date(status.timestamp).toLocaleString('zh-CN')}</span></div>
+    `;
+  } catch(e) {
+    document.getElementById('systemOverview').innerHTML = '<span style="color:#f85149">连接失败</span>';
+  }
+
+  try {
+    const mem = await fetchJSON('/api/v2/memory/stats');
+    document.getElementById('memoryStats').innerHTML = `
+      <div class="metric-row"><span class="metric-label">短期记忆</span><span class="metric-value">${mem.short_term_count || 0}</span></div>
+      <div class="metric-row"><span class="metric-label">长期记忆</span><span class="metric-value">${mem.long_term_count || 0}</span></div>
+      <div class="metric-row"><span class="metric-label">工作记忆</span><span class="metric-value">${mem.working_count || 0}</span></div>
+    `;
+  } catch(e) {}
+
+  try {
+    const health = await fetchJSON('/api/v2/health');
+    document.getElementById('healthInfo').innerHTML = `
+      <div class="metric-row"><span class="metric-label">CPU</span><span class="metric-value">${(health.cpu_percent || 0).toFixed(1)}%</span></div>
+      <div class="metric-row"><span class="metric-label">内存</span><span class="metric-value">${(health.memory_percent || 0).toFixed(1)}%</span></div>
+      <div class="metric-row"><span class="metric-label">磁盘</span><span class="metric-value">${(health.disk_percent || 0).toFixed(1)}%</span></div>
+      <div class="metric-row"><span class="metric-label">数据库</span><span class="metric-value">${health.database_connected ? '✓ 连接' : '✗ 断开'}</span></div>
+      <div class="metric-row"><span class="metric-label">活跃模块</span><span class="metric-value">${health.active_modules || 0}</span></div>
+    `;
+  } catch(e) {}
+}
+
+// Smart Router
+async function routeModel(taskType) {
+  const el = document.getElementById('routingResult');
+  el.textContent = '路由中...';
+  try {
+    const result = await fetchJSON('/api/v2/routing/recommend', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({task_type: taskType})
+    });
+    el.innerHTML = `<span class="log-info">任务类型: ${taskType}</span>\n` +
+      `<span class="log-ok">✅ 选中模型: ${result.selected_model.name} (${result.selected_model.provider})</span>\n` +
+      `<span class="log-warn">理由: ${result.reason}</span>\n\n` +
+      `<span class="log-info">备选方案:</span>\n` +
+      result.alternatives.map((a, i) => `  ${i+1}. ${a.name} (${a.provider})`).join('\n');
+  } catch(e) {
+    el.innerHTML = `<span class="log-err">错误: ${e.message}</span>`;
+  }
+}
+
+// Red Team
+async function redteamVerify(scenario) {
+  const el = document.getElementById('redteamResult');
+  el.textContent = '验证中...';
+
+  const scenarios = {
+    good: {
+      task_id: 'demo_redteam_good',
+      claim: '2026年Q3 GDP增长率为6.2%',
+      commitment_level: 'B',
+      evidence_list: [
+        {source_url: 'https://stats.gov.cn/gdp', content_hash: 'abc123', credibility: 0.95},
+        {source_url: 'https://worldbank.org/data', content_hash: 'def456', credibility: 0.9},
+        {source_url: 'https://imf.org/report', content_hash: 'ghi789', credibility: 0.88}
+      ],
+      methodology: {name: 'regression', sample_size: 1000, falsifiable_anchor: '若Q3实际GDP低于5.8%或高于6.6%则证伪'}
+    },
+    no_anchor: {
+      task_id: 'demo_redteam_noanchor',
+      claim: '市场将大幅上涨',
+      commitment_level: 'A',
+      evidence_list: [
+        {source_url: 'https://finance.com', content_hash: 'aaa', credibility: 0.7}
+      ],
+      methodology: {name: 'expert_opinion', sample_size: 5}
+    },
+    pseudo_source: {
+      task_id: 'demo_redteam_pseudo',
+      claim: '多源证实：技术突破已确认',
+      commitment_level: 'B',
+      evidence_list: [
+        {source_url: 'https://news-site-a.com/article/123', content_hash: 'x1', credibility: 0.6},
+        {source_url: 'https://news-site-a.com/article/456', content_hash: 'x2', credibility: 0.6},
+        {source_url: 'https://news-site-a.com/article/789', content_hash: 'x3', credibility: 0.6}
+      ],
+      methodology: {name: 'multi_source', sample_size: 50, falsifiable_anchor: '若技术未经第三方验证则证伪'}
+    }
+  };
+
+  try {
+    const result = await fetchJSON('/api/v2/red-team/verify', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(scenarios[scenario])
+    });
+    const blockText = result.should_block ? '🚫 阻断' : '✅ 通过';
+    const blockClass = result.should_block ? 'log-err' : 'log-ok';
+    el.innerHTML = `<span class="log-info">场景: ${scenario}</span>\n` +
+      `<span class="log-info">结论: ${scenarios[scenario].claim}</span>\n\n` +
+      `<span class="log-info">验证结果: ${result.overall_result}</span>\n` +
+      `<span class="log-info">建议等级: ${result.recommended_commitment_level || result.recommended_level}</span>\n` +
+      `<span class="log-info">检查项数: ${result.findings_count}</span>\n` +
+      `<span class="${blockClass}">${blockText}</span>\n` +
+      (result.block_reason ? `<span class="log-err">原因: ${result.block_reason}</span>` : '');
+  } catch(e) {
+    el.innerHTML = `<span class="log-err">错误: ${e.message}</span>`;
+  }
+}
+
+// Forecast
+async function runForecastLifecycle() {
+  const el = document.getElementById('forecastResult');
+  el.textContent = '运行预测生命周期...';
+
+  let log = '';
+  const addLog = (cls, text) => { log += `<span class="${cls}">${text}</span>\n`; el.innerHTML = log; };
+
+  try {
+    // Register
+    addLog('log-info', '📝 步骤1: 登记预测');
+    const reg = await fetchJSON('/api/v2/forecast/register', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        task_id: 'demo_forecast',
+        event_description: '7天内北京会下雨',
+        probability: 0.72,
+        time_range_start: new Date().toISOString(),
+        time_range_end: new Date(Date.now() + 7*86400000).toISOString(),
+        falsifiable_anchor: '若7天内北京未降雨则证伪',
+        premises: ['气象数据显示湿度82%', '冷锋即将到达'],
+        evidence_snapshot: {source: 'weather.gov.cn', fetched_at: new Date().toISOString()}
+      })
+    });
+    addLog('log-ok', `  ✓ 预测已登记 ID: ${reg.forecast_id.substring(0, 8)}...`);
+    addLog('', `    概率: ${reg.probability} | 证伪锚点: ${reg.falsifiable_anchor}`);
+
+    // Settle
+    addLog('log-info', '\n📝 步骤2: 结算预测（假设实际下雨了）');
+    const settle = await fetchJSON('/api/v2/forecast/settle', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        forecast_id: reg.forecast_id,
+        actual_outcome: true
+      })
+    });
+    addLog('log-ok', `  ✓ 结算结果: ${settle.outcome}`);
+    addLog('', `    Brier Score: ${(settle.brier_score || 0).toFixed(4)}`);
+    addLog('', `    原因: ${settle.reason}`);
+
+    // Brier
+    addLog('log-info', '\n📝 步骤3: 计算累计Brier Score');
+    const brier = await fetchJSON('/api/v2/forecast/brier');
+    addLog('log-ok', `  ✓ 已结算预测数: ${brier.count}`);
+    addLog('', `    Brier Score: ${(brier.score || 0).toFixed(4)}`);
+    addLog('', `    校准良好: ${brier.calibrated ? '✓ 是' : '✗ 否'}`);
+
+    addLog('log-ok', '\n✅ 预测生命周期完成: 登记 → 结算 → 回测');
+  } catch(e) {
+    addLog('log-err', `\n错误: ${e.message}`);
+  }
+}
+
+async function listForecasts() {
+  const el = document.getElementById('forecastResult');
+  try {
+    const list = await fetchJSON('/api/v2/forecast/list');
+    if (list.length === 0) {
+      el.innerHTML = '<span class="log-warn">暂无预测记录</span>';
+    } else {
+      el.innerHTML = list.map(f =>
+        `<span class="log-info">[${f.forecast_id.substring(0,8)}]</span> ${f.event_description}\n` +
+        `  概率: ${f.probability} | 状态: ${f.settled ? '已结算('+f.outcome+')' : '未结算'}\n` +
+        `  Brier: ${f.brier_score || '-'} | 证伪: ${f.falsifiable_anchor}\n`
+      ).join('\n');
+    }
+  } catch(e) {
+    el.innerHTML = `<span class="log-err">错误: ${e.message}</span>`;
+  }
+}
+
+// Validation Gate
+async function testGate(scenario) {
+  const el = document.getElementById('gateResult');
+  const scenarios = {
+    valid: {
+      module_name: 'm1_collection',
+      status: 'success',
+      output_data: {'count': 15, 'sources': ['gov.cn', 'reuters.com']},
+      evidence_refs: ['ev_001', 'ev_002', 'ev_003']
+    },
+    empty: {
+      module_name: 'm1_collection',
+      status: 'success',
+      output_data: {},
+      evidence_refs: []
+    },
+    critical_fail: {
+      module_name: 'm1_collection',
+      status: 'failed',
+      output_data: {},
+      errors: ['connection timeout to all sources']
+    }
+  };
+
+  el.textContent = '验证中...';
+  try {
+    const resp = await fetch(API + '/api/v2/gate/validate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(scenarios[scenario])
+    });
+    const result = await resp.json();
+    const passText = result.passed ? '✅ 通过' : '🚫 不通过';
+    const blockText = result.should_block ? '🚫 阻断流程' : '⚠️ 警告但不阻断';
+    const passClass = result.passed ? 'log-ok' : 'log-err';
+    const blockClass = result.should_block ? 'log-err' : 'log-warn';
+
+    el.innerHTML = `<span class="log-info">场景: ${scenario}</span>\n` +
+      `<span class="log-info">模块: ${scenarios[scenario].module_name}</span>\n\n` +
+      `<span class="${passClass}">${passText}</span>\n` +
+      `<span class="${blockClass}">${result.should_block ? blockText : '不阻断'}</span>\n` +
+      (result.critical_issues?.length ? `\n<span class="log-err">关键问题:</span>\n` + result.critical_issues.map(i => `  • ${i}`).join('\n') : '') +
+      (result.warnings?.length ? `\n<span class="log-warn">警告:</span>\n` + result.warnings.map(w => `  • ${w}`).join('\n') : '');
+  } catch(e) {
+    el.innerHTML = `<span class="log-err">错误: ${e.message}</span>`;
+  }
+}
+
+// Init
+loadDashboard();
+setInterval(loadDashboard, 10000);
+</script>
+</body>
+</html>

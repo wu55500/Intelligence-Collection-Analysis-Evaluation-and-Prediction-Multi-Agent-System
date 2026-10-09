@@ -75,6 +75,8 @@ def test_commitment_engine_a_level(commitment_engine):
         is_expired=False,
         single_source=False,
         data_quality_level=EvidenceQuality.S,
+        has_falsifiable_anchor=True,
+        has_structural_break=False,
     )
 
     decision = commitment_engine.evaluate(input_data)

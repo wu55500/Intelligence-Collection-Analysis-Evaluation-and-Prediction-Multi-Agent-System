@@ -1,4 +1,12 @@
 __pycache__/
 *.pyc
-*.db
 .pytest_cache/
+data/*.db
+data/*.sqlite
+*.egg-info/
+.env
+.venv/
+node_modules/
+*.log
+.idea/
+.vscode/

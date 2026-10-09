@@ -408,6 +408,33 @@ class Database:
                 for row in rows
             ]
     
+    def get_settled_forecasts(self) -> List[ForecastRecord]:
+        """获取已结算的预测"""
+        with self.get_connection() as conn:
+            rows = conn.execute(
+                "SELECT * FROM forecasts WHERE settled = 1"
+            ).fetchall()
+            
+            return [
+                ForecastRecord(
+                    forecast_id=row["forecast_id"],
+                    event_description=row["event_description"],
+                    probability=row["probability"],
+                    time_range_start=datetime.fromisoformat(row["time_range_start"]),
+                    time_range_end=datetime.fromisoformat(row["time_range_end"]),
+                    falsifiable_anchor=row["falsifiable_anchor"],
+                    premises=json.loads(row["premises"]),
+                    registered_at=datetime.fromisoformat(row["registered_at"]),
+                    settled=bool(row["settled"]),
+                    settled_at=datetime.fromisoformat(row["settled_at"]) if row["settled_at"] else None,
+                    outcome=row["outcome"],
+                    brier_score=row["brier_score"],
+                    evidence_snapshot=json.loads(row["evidence_snapshot"]),
+                    task_id=row["task_id"]
+                )
+                for row in rows
+            ]
+    
     # ========== 审计日志 ==========
     
     def log_audit(self, audit: AuditLog) -> str:

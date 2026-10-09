@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: intel-system-api
+  labels:
+    app: intel-system
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: intel-system
+  template:
+    metadata:
+      labels:
+        app: intel-system
+    spec:
+      containers:
+      - name: api
+        image: intel-system:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: REDIS_HOST
+          value: "redis-service"
+        - name: DATABASE_PATH
+          value: "/data/intel_system.db"
+        volumeMounts:
+        - name: data-volume
+          mountPath: /data
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+      volumes:
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: intel-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: intel-system-service
+spec:
+  selector:
+    app: intel-system
+  ports:
+  - port: 80
+    targetPort: 8000
+  type: LoadBalancer
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: intel-data-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

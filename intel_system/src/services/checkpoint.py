@@ -25,7 +25,7 @@ class CheckpointStatus(str, Enum):
 
 @dataclass
 class Checkpoint:
-    """检查点"""
+    """检查点 - V2.1 并发安全版"""
     checkpoint_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     task_id: str = ""
     step_name: str = ""
@@ -38,6 +38,16 @@ class Checkpoint:
     error_message: str = ""
     retry_count: int = 0
     max_retries: int = 3
+    # V2.1 新增字段
+    execution_id: str = ""          # 每次真实执行的独立标识
+    idempotency_key: str = ""       # 同一业务操作重试时复用
+    attempt: int = 1                # 第几次尝试
+    lease_owner: str = ""           # 当前持有执行权的worker
+    lease_expires_at: Optional[datetime] = None  # 租约过期时间
+    input_hash: str = ""            # 输入内容哈希（区分复用/重跑）
+    output_hash: str = ""           # 输出内容哈希（识别结果变化）
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
 
 
 class CheckpointService:
@@ -73,12 +83,23 @@ class CheckpointService:
                 error_message TEXT,
                 retry_count INTEGER DEFAULT 0,
                 max_retries INTEGER DEFAULT 3,
+                execution_id TEXT DEFAULT '',
+                idempotency_key TEXT DEFAULT '',
+                attempt INTEGER DEFAULT 1,
+                lease_owner TEXT DEFAULT '',
+                lease_expires_at TEXT,
+                input_hash TEXT DEFAULT '',
+                output_hash TEXT DEFAULT '',
+                started_at TEXT,
+                completed_at TEXT,
                 UNIQUE(task_id, step_name)
             )
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_task ON checkpoints(task_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_task_step ON checkpoints(task_id, step_name)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_status ON checkpoints(status)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_execution ON checkpoints(execution_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_idempotency ON checkpoints(idempotency_key)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_lease ON checkpoints(lease_owner, lease_expires_at)")
         conn.commit()
         conn.close()
     

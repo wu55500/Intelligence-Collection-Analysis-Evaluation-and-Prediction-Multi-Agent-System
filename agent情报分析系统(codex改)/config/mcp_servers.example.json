@@ -1,0 +1,16 @@
+{
+  "_comment": "M23 MCP server 配置样例。复制为 mcp_servers.json 后按需修改。逆向工具只读，不要在 allowlist 增加任何写/执行类工具。",
+  "backend_default": "binutils",
+  "servers": [
+    {
+      "name": "reverse",
+      "_comment": "本模块自带只读逆向 server。binutils 云机零依赖；本地装 Ghidra 后改 backend_default=ghidra 出伪C。",
+      "command": "python3",
+      "args": ["-m", "modules.m23_mcp.reverse_mcp_server"],
+      "cwd": "src",
+      "env": {"REVERSE_BACKEND": "binutils"},
+      "enabled": true,
+      "allowlist": ["file_info", "list_functions", "get_imports", "get_strings", "decompile_function"]
+    }
+  ]
+}

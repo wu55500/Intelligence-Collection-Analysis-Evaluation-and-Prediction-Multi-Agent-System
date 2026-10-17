@@ -45,6 +45,13 @@ class AnalysisAgent(BaseAgent):
         self.register_tool("causal_review", self._tool_causal_review)
         self.register_tool("commitment_eval", self._tool_commitment_eval)
         self.register_tool("forecast_register", self._tool_forecast_register)
+
+        # M23：增量挂载只读逆向工具（懒执行；未启用/未启动时安全降级，不影响既有流程）
+        try:
+            from ..modules.m23_mcp.agent_wiring import attach_reverse_tool
+            attach_reverse_tool(self)
+        except Exception:
+            pass
     
     async def _tool_eda(self, **kwargs) -> Dict[str, Any]:
         """EDA分析工具"""

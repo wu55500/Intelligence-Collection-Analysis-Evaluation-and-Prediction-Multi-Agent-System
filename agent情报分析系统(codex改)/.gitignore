@@ -1,0 +1,42 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# ===== 逆向产物：编译二进制/样本/反编译输出一律不进 public 仓 =====
+*.o
+*.so
+*.exe
+*.elf
+*.bin
+lab/crackme
+**/crackme_bin
+# 例外：自写测试夹具源码可入库
+!tests_m23/fixtures/*.c
+# Ghidra/IDA/objdump 工程与导出
+*.rep/
+*.gpr
+*.i64
+*.idb
+*.asm.tmp
+decomp_out/
+
+# ===== 运行时数据/密钥/本地配置 =====
+data/
+*.db
+*.sqlite
+*.sqlite3
+.env
+.env.*
+config/mcp_servers.json
+*.log
+
+# ===== 系统/编辑器 =====
+.DS_Store
+.idea/
+.vscode/

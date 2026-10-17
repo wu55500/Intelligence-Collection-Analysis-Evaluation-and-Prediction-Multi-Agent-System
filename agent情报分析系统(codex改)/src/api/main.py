@@ -42,7 +42,26 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     db = get_database()
     print(f"系统启动 | 架构: v2_四层 | 数据库: {settings.database.db_path}")
+
+    # M23：启动只读 MCP 逆向工具集（失败不阻断主服务；探针路由 /mcp/health 可见状态）
+    try:
+        from ..modules.m23_mcp.integration import start_m23, stop_m23
+        import os as _os
+        _backend = _os.getenv("INTEL_M23_BACKEND", "binutils")
+        if _os.getenv("INTEL_M23_MCP_ENABLED", "1") not in ("0", "false", "False", ""):
+            await start_m23(backend=_backend)
+            print("M23 MCP 逆向工具集已启动")
+    except Exception as _m23_err:
+        print(f"M23 MCP 启动失败（不阻断主服务）: {type(_m23_err).__name__}: {_m23_err}")
+
     yield
+
+    # M23：关闭
+    try:
+        from ..modules.m23_mcp.integration import stop_m23
+        await stop_m23()
+    except Exception:
+        pass
     print("系统关闭")
 
 
@@ -71,6 +90,13 @@ _red_team = IndependentVerifier()
 _checkpoint_svc = CheckpointService()
 _health_monitor = SystemHealthMonitor()
 _metrics = MetricsCollector()
+
+# M23：挂载只读逆向工具探针路由（/mcp/health、/mcp/tools、/mcp/analyze）
+try:
+    from ..modules.m23_mcp.integration import create_m23_router
+    app.include_router(create_m23_router())
+except Exception:
+    pass
 
 
 

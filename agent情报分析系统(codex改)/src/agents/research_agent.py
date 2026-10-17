@@ -43,6 +43,13 @@ class ResearchAgent(BaseAgent):
         self.register_tool("collect", self._tool_collect)
         self.register_tool("govern", self._tool_govern)
         self.register_tool("evaluate", self._tool_evaluate)
+
+        # M23：增量挂载只读逆向工具（懒执行；未启用/未启动时安全降级，不影响既有流程）
+        try:
+            from ..modules.m23_mcp.agent_wiring import attach_reverse_tool
+            attach_reverse_tool(self)
+        except Exception:
+            pass
     
     async def _tool_collect(self, **kwargs) -> Dict[str, Any]:
         """采集工具"""

@@ -16,6 +16,35 @@ import uuid
 from ...core.schemas import Claim, Evidence, CommitmentLevel, EvidenceQuality
 
 
+def _load_taxonomy_fallacies() -> Dict[str, Dict[str, Any]]:
+    """
+    从认知偏差知识库（src/infra/bias/taxonomy，35 条唯一偏差）生成谬误检查条目。
+
+    依赖缺失时静默降级为空（不影响报告生成），保证 m13 单独可用。
+    """
+    try:
+        from ...infra.bias import taxonomy as _t
+    except Exception:
+        return {}
+    out: Dict[str, Dict[str, Any]] = {}
+    for b in _t.BIASES:
+        if not b.indicators:
+            continue
+        out[b.id] = {
+            "name": b.name,
+            "indicators": list(b.indicators),
+            "description": b.definition,
+            "suggestion": b.mitigation,
+            "category": b.category,
+            "counter_question": b.counter_question,
+            "severity": b.severity,
+        }
+    return out
+
+
+_TAXONOMY_FALLACIES = _load_taxonomy_fallacies()
+
+
 @dataclass
 class FallacyCheck:
     """逻辑谬误检查"""
@@ -23,6 +52,11 @@ class FallacyCheck:
     detected: bool
     description: str
     suggestion: str
+    # 以下为认知偏差库并入后新增的可选字段（保持旧构造方式兼容）
+    category: str = ""
+    counter_question: str = ""
+    severity: str = "review"
+    evidence: str = ""
 
 
 @dataclass
@@ -83,7 +117,7 @@ class ReportGenerator:
     5. 可证伪锚点
     """
     
-    FALLACY_PATTERNS = {
+    _LEGACY_FALLACIES = {
         "survivorship_bias": {
             "name": "幸存者偏差",
             "indicators": ["成功案例", "幸存者", "存活率", "回报率"],
@@ -121,6 +155,10 @@ class ReportGenerator:
             "suggestion": "确保前提和结论来自独立的信息源"
         }
     }
+
+    # 历史 6 条谬误 + 认知偏差库（35 条唯一偏差）合并；同名 id 以知识库版本为准。
+    # 只增不减：历史 fallacy_type 全部保留，下游消费方不受影响。
+    FALLACY_PATTERNS = {**_LEGACY_FALLACIES, **_TAXONOMY_FALLACIES}
     
     def generate(
         self,
@@ -338,17 +376,42 @@ class ReportGenerator:
         """
         all_text = " ".join(c.content for c in claims)
         all_text += " " + " ".join(e.raw_content[:200] for e in evidence_list)
-        
+
+        # 优先用认知偏差检测器（分句 + 强/弱指标双档，压低误报）；不可用时退回关键词直扫
+        hit_map: Dict[str, Any] = {}
+        try:
+            from ...infra.bias import BiasDetector, SCOPE_EVIDENCE
+
+            det = BiasDetector()
+            for h in det.audit_text(all_text, scope=SCOPE_EVIDENCE):
+                hit_map.setdefault(h.bias_id, h)
+            # 证据结构层（幸存者/确认偏误/信息茧房/缺基率）必须一起跑，否则只看措辞会漏判
+            for h in det.audit_evidence(claims=claims, evidence=evidence_list):
+                hit_map.setdefault(h.bias_id, h)
+        except Exception:
+            hit_map = {}
+
         checks = []
         for fallacy_key, pattern in self.FALLACY_PATTERNS.items():
-            detected = any(ind in all_text for ind in pattern["indicators"])
+            hit = hit_map.get(fallacy_key)
+            if hit is not None:
+                detected, evidence_text = True, hit.context
+            else:
+                strong = [i for i in pattern["indicators"] if len(i) >= 3]
+                matched = [i for i in strong if i in all_text]
+                detected, evidence_text = bool(matched), "、".join(matched)
+
             checks.append(FallacyCheck(
                 fallacy_type=fallacy_key,
                 detected=detected,
                 description=pattern["description"],
-                suggestion=pattern["suggestion"] if detected else "未检测到"
+                suggestion=pattern["suggestion"] if detected else "未检测到",
+                category=pattern.get("category", ""),
+                counter_question=pattern.get("counter_question", ""),
+                severity=pattern.get("severity", "review"),
+                evidence=evidence_text[:120],
             ))
-        
+
         return checks
     
     def _check_interest_chain(self, evidence_list: List[Evidence]) -> InterestChainCheck:

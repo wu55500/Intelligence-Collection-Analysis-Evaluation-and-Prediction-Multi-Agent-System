@@ -16,6 +16,7 @@ class ReflectionType(str, Enum):
     QUALITY_IMPROVEMENT = "quality_improvement"  # 质量提升
     EFFICIENCY_OPTIMIZATION = "efficiency_optimization"  # 效率优化
     HALLUCINATION_CHECK = "hallucination_check"  # 幻觉检查
+    COGNITIVE_BIAS_CHECK = "cognitive_bias_check"  # 认知偏差检查
 
 
 @dataclass
@@ -82,7 +83,11 @@ class ReflectionEngine:
         quality_issues = self._check_quality(original_output, task_type)
         reflection.issues_found.extend(quality_issues)
 
-        # 4. 生成修正建议
+        # 4. 认知偏差检查（《认知偏差大全》35 条唯一偏差，确定性分句检测）
+        bias_issues = self._check_cognitive_bias(original_output, context)
+        reflection.issues_found.extend(bias_issues)
+
+        # 5. 生成修正建议
         if reflection.issues_found:
             reflection.corrections = self._generate_corrections(
                 reflection.issues_found, original_output, context
@@ -90,7 +95,11 @@ class ReflectionEngine:
             reflection.corrected_output = self._apply_corrections(
                 original_output, reflection.corrections
             )
-            reflection.confidence_after = min(1.0, confidence + 0.1 * len(reflection.corrections))
+            delta = 0.1 * len(reflection.corrections)
+            # 偏差命中属于"需复核"信号，不能反过来抬高置信度
+            if bias_issues:
+                delta = min(0.0, delta - 0.05 * len(bias_issues))
+            reflection.confidence_after = max(0.0, min(1.0, confidence + delta))
         else:
             reflection.corrected_output = original_output
             reflection.confidence_after = confidence
@@ -99,6 +108,29 @@ class ReflectionEngine:
         self.reflection_history.append(reflection)
 
         return reflection
+
+    def _check_cognitive_bias(self, output: str, context: Dict[str, Any]) -> List[str]:
+        """
+        认知偏差检查（回答视角）
+
+        检测器缺失时静默跳过，保证反思引擎在裁剪环境下仍可用。
+        命中只产生"追问/复核"提示，不做自动改写。
+        """
+        try:
+            from ..bias import BiasDetector, SCOPE_ANSWER
+
+            hits = BiasDetector().audit_text(output, scope=SCOPE_ANSWER)
+        except Exception:
+            return []
+
+        issues = []
+        for h in hits:
+            tag = {"block": "必改", "downgrade": "降级"}.get(h.severity, "复核")
+            issues.append(
+                f"[认知偏差·{tag}] {h.name}（{h.category}）：命中「{h.matched}」"
+                f"→ 自问：{h.counter_question}；对策：{h.mitigation}"
+            )
+        return issues
 
     def _check_hallucinations(self, output: str, context: Dict[str, Any]) -> List[str]:
         """检查幻觉（生成不存在的引用或数据）"""

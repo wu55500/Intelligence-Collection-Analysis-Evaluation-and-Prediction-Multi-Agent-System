@@ -52,6 +52,13 @@ class AnalysisAgent(BaseAgent):
             attach_reverse_tool(self)
         except Exception:
             pass
+
+        # 认知偏差：增量挂载 bias_audit / question_audit 两个确定性审计工具
+        try:
+            from ..infra.bias.wiring import attach_bias_tools
+            attach_bias_tools(self)
+        except Exception:
+            pass
     
     async def _tool_eda(self, **kwargs) -> Dict[str, Any]:
         """EDA分析工具"""
